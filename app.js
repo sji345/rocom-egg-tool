@@ -21,6 +21,10 @@ const refreshMerchantBtn = document.querySelector("#refreshMerchantBtn");
 
 let activeFilter = "all";
 let merchantNextDate = null;
+let merchantLastAutoRefresh = 0;
+
+const MERCHANT_REFRESH_HOURS = [8, 12, 16, 20];
+const MERCHANT_RETRY_INTERVAL = 60000;
 
 function numberValue(input) {
   const value = Number.parseFloat(input.value);
@@ -141,10 +145,78 @@ function formatBeijingTime(value) {
   return value.replace(/^\d{4}-/, "").slice(0, 11);
 }
 
+function formatBeijingDateTime(date) {
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour12: false,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date).reduce((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
 function parseBeijingDate(value) {
   if (!value) return null;
   const date = new Date(`${value.replace(" ", "T")}+08:00`);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function beijingDateAt(hour, dayOffset = 0) {
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour12: false,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date()).reduce((acc, part) => {
+    acc[part.type] = Number(part.value);
+    return acc;
+  }, {});
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day + dayOffset, hour - 8, 0, 0));
+}
+
+function currentMerchantWindow() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour12: false,
+    hourCycle: "h23",
+    hour: "2-digit",
+  }).formatToParts(now).reduce((acc, part) => {
+    acc[part.type] = Number(part.value);
+    return acc;
+  }, {});
+  const hour = parts.hour;
+
+  if (hour < MERCHANT_REFRESH_HOURS[0]) {
+    return {
+      round: null,
+      nextRefreshBeijing: formatBeijingDateTime(beijingDateAt(8)),
+      isOpen: false,
+    };
+  }
+
+  const index = MERCHANT_REFRESH_HOURS.findIndex((start, currentIndex) => {
+    const next = MERCHANT_REFRESH_HOURS[currentIndex + 1] ?? 24;
+    return hour >= start && hour < next;
+  });
+  const round = index + 1;
+  const nextHour = MERCHANT_REFRESH_HOURS[index + 1] ?? 0;
+
+  return {
+    round,
+    nextRefreshBeijing: formatBeijingDateTime(beijingDateAt(nextHour, nextHour === 0 ? 1 : 0)),
+    isOpen: true,
+  };
 }
 
 function updateCountdown() {
@@ -160,6 +232,16 @@ function updateCountdown() {
   merchantCountdown.textContent = [hours, minutes, seconds]
     .map((part) => String(part).padStart(2, "0"))
     .join(":");
+
+  if (
+    diff === 0 &&
+    !merchantView.classList.contains("is-hidden") &&
+    !refreshMerchantBtn.disabled &&
+    Date.now() - merchantLastAutoRefresh > MERCHANT_RETRY_INTERVAL
+  ) {
+    merchantLastAutoRefresh = Date.now();
+    loadMerchant();
+  }
 }
 
 function normalizeMerchantItem(item) {
@@ -202,6 +284,47 @@ function renderMerchantItems(items) {
   }).join("");
 }
 
+function resolveMerchantData(data) {
+  const schedule = currentMerchantWindow();
+  const sourceItems = data.items || [];
+  const sourceNext = parseBeijingDate(data.nextRefreshBeijing);
+  const sourceNextIsPast = sourceNext && sourceNext.getTime() <= Date.now() - 30000;
+  const scheduledItems = schedule.round && data.rounds?.[schedule.round]
+    ? data.rounds[schedule.round]
+    : [];
+  const shouldUseScheduledItems = schedule.isOpen &&
+    scheduledItems.length &&
+    (!sourceItems.length || data.status === "closed" || sourceNextIsPast);
+
+  if (shouldUseScheduledItems) {
+    return {
+      status: "数据延迟",
+      round: schedule.round,
+      nextRefreshBeijing: schedule.nextRefreshBeijing,
+      items: scheduledItems,
+      note: "源站当前轮次更新有延迟，已按北京时间刷新档位展示备用商品表。",
+    };
+  }
+
+  if (schedule.isOpen && !sourceItems.length) {
+    return {
+      status: "数据延迟",
+      round: schedule.round,
+      nextRefreshBeijing: schedule.nextRefreshBeijing,
+      items: [],
+      note: "源站已到营业时间但暂未返回商品，页面会自动重试。",
+    };
+  }
+
+  return {
+    status: data.status === "closed" ? "未营业" : "实时数据",
+    round: data.round || schedule.round,
+    nextRefreshBeijing: data.nextRefreshBeijing || schedule.nextRefreshBeijing,
+    items: sourceItems,
+    note: "",
+  };
+}
+
 async function loadMerchant() {
   merchantStatus.textContent = "获取中";
   merchantNote.textContent = "正在连接远行商人公开数据源。";
@@ -213,13 +336,15 @@ async function loadMerchant() {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    const items = (data.items || []).map(normalizeMerchantItem);
+    const resolved = resolveMerchantData(data);
+    const items = resolved.items.map(normalizeMerchantItem);
+    const sourceTime = data.fetchedAt ? new Date(data.fetchedAt).toLocaleString("zh-CN") : "未知时间";
 
-    merchantStatus.textContent = data.status === "closed" ? "未营业" : "实时数据";
-    merchantRound.textContent = data.round ? `第 ${data.round} 轮` : "--";
-    merchantNext.textContent = formatBeijingTime(data.nextRefreshBeijing);
-    merchantNextDate = parseBeijingDate(data.nextRefreshBeijing);
-    merchantNote.textContent = `数据更新于 ${data.fetchedAt ? new Date(data.fetchedAt).toLocaleString("zh-CN") : "未知时间"}，时间按北京时间显示。`;
+    merchantStatus.textContent = resolved.status;
+    merchantRound.textContent = resolved.round ? `第 ${resolved.round} 轮` : "--";
+    merchantNext.textContent = formatBeijingTime(resolved.nextRefreshBeijing);
+    merchantNextDate = parseBeijingDate(resolved.nextRefreshBeijing);
+    merchantNote.textContent = `数据更新于 ${sourceTime}，时间按北京时间显示。${resolved.note ? ` ${resolved.note}` : ""}`;
     renderMerchantItems(items);
     updateCountdown();
   } catch (error) {
