@@ -1,4 +1,4 @@
-const records = window.EGG_RECORDS || [];
+﻿const records = window.EGG_RECORDS || [];
 
 const heightInput = document.querySelector("#heightInput");
 const weightInput = document.querySelector("#weightInput");
@@ -18,150 +18,13 @@ const merchantCountdown = document.querySelector("#merchantCountdown");
 const merchantNote = document.querySelector("#merchantNote");
 const merchantItems = document.querySelector("#merchantItems");
 const refreshMerchantBtn = document.querySelector("#refreshMerchantBtn");
-const materialsView = document.querySelector("#materialsView");
-const recipeSelect = document.querySelector("#recipeSelect");
-const variantSelect = document.querySelector("#variantSelect");
-const craftCountInput = document.querySelector("#craftCountInput");
-const recipeNote = document.querySelector("#recipeNote");
-const materialSummary = document.querySelector("#materialSummary");
-const inventoryList = document.querySelector("#inventoryList");
-const clearInventoryBtn = document.querySelector("#clearInventoryBtn");
 
 let activeFilter = "all";
 let merchantNextDate = null;
 let merchantLastAutoRefresh = 0;
-let currentMerchantNames = [];
-let inventory = {};
 
 const MERCHANT_REFRESH_HOURS = [8, 12, 16, 20];
 const MERCHANT_RETRY_INTERVAL = 60000;
-const INVENTORY_KEY = "rocom-material-inventory-v1";
-const ATTRIBUTE_BALL_NOTE = "属性球公开资料只确认“2个普通咕噜球 + 对应植物材料”，具体植物材料请以游戏内配方为准。";
-
-const RECIPES = [
-  {
-    id: "normal-ball",
-    name: "普通咕噜球",
-    category: "咕噜球",
-    output: "2个/次",
-    note: "常规条件球任务优先做这个，材料最容易凑。",
-    variants: [
-      { name: "催化剂 + 光灵石", materials: [{ name: "催化剂", count: 1 }, { name: "光灵石", count: 1 }] },
-      { name: "催化剂 + 光灵石 + 羽毛", materials: [{ name: "催化剂", count: 1 }, { name: "光灵石", count: 1 }, { name: "羽毛", count: 1 }] },
-      { name: "催化剂 + 光灵石 + 叶子", materials: [{ name: "催化剂", count: 1 }, { name: "光灵石", count: 1 }, { name: "叶子", count: 1 }] },
-      { name: "催化剂 + 光灵石 + 土灵石", materials: [{ name: "催化剂", count: 1 }, { name: "光灵石", count: 1 }, { name: "土灵石", count: 1 }] },
-    ],
-  },
-  {
-    id: "middle-ball",
-    name: "中级咕噜球",
-    category: "咕噜球",
-    output: "2个/次",
-    note: "固定配方，适合日常补捕捉球。",
-    variants: [
-      { name: "固定配方", materials: [{ name: "催化剂", count: 1 }, { name: "木块", count: 1 }, { name: "水灵石", count: 1 }] },
-    ],
-  },
-  {
-    id: "advanced-ball",
-    name: "高级咕噜球",
-    category: "咕噜球",
-    output: "按游戏内产出",
-    note: "公开资料给出多种组合，优先选你库存最富余的一组。",
-    variants: [
-      { name: "水滴 + 木灵石", materials: [{ name: "催化剂", count: 1 }, { name: "水滴", count: 1 }, { name: "木灵石", count: 1 }] },
-      { name: "水滴 + 木块", materials: [{ name: "催化剂", count: 1 }, { name: "水滴", count: 1 }, { name: "木块", count: 1 }] },
-      { name: "花朵 + 光灵石", materials: [{ name: "催化剂", count: 1 }, { name: "花朵", count: 1 }, { name: "光灵石", count: 1 }] },
-      { name: "花朵 + 木灵石", materials: [{ name: "催化剂", count: 1 }, { name: "花朵", count: 1 }, { name: "木灵石", count: 1 }] },
-      { name: "火灵石 + 木灵石", materials: [{ name: "催化剂", count: 1 }, { name: "火灵石", count: 1 }, { name: "木灵石", count: 1 }] },
-      { name: "光灵石 + 木灵石", materials: [{ name: "催化剂", count: 1 }, { name: "光灵石", count: 1 }, { name: "木灵石", count: 1 }] },
-    ],
-  },
-  {
-    id: "attribute-ball",
-    name: "属性咕噜球",
-    category: "咕噜球",
-    output: "按游戏内产出",
-    note: ATTRIBUTE_BALL_NOTE,
-    variants: [
-      { name: "光合球（草/光）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-      { name: "调温球（火/冰）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-      { name: "暗星球（幽/噩）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-      { name: "绝缘球（电/毒）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-      { name: "淘沙球（地/虫）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-      { name: "变幻球（幻/机械）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-      { name: "网兜球（水/翼）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-      { name: "好战球（武/龙）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-      { name: "美妙球（萌/普通）", materials: [{ name: "普通咕噜球", count: 2 }, { name: "对应植物材料", count: 1 }] },
-    ],
-  },
-  {
-    id: "skill-stone-normal",
-    name: "普通技能石",
-    category: "技能石",
-    output: "1个/次",
-    note: "通用规则：1魔法石 + 3个对应属性灵石。",
-    variants: [
-      { name: "火系", materials: [{ name: "魔法石", count: 1 }, { name: "火灵石", count: 3 }] },
-      { name: "水系", materials: [{ name: "魔法石", count: 1 }, { name: "水灵石", count: 3 }] },
-      { name: "草系", materials: [{ name: "魔法石", count: 1 }, { name: "木灵石", count: 3 }] },
-      { name: "电系", materials: [{ name: "魔法石", count: 1 }, { name: "电灵石", count: 3 }] },
-      { name: "土系", materials: [{ name: "魔法石", count: 1 }, { name: "土灵石", count: 3 }] },
-      { name: "光系", materials: [{ name: "魔法石", count: 1 }, { name: "光灵石", count: 3 }] },
-      { name: "暗系", materials: [{ name: "魔法石", count: 1 }, { name: "暗灵石", count: 3 }] },
-    ],
-  },
-  {
-    id: "skill-stone-rare",
-    name: "稀有技能石",
-    category: "技能石",
-    output: "1个/次",
-    note: "高阶规则：3魔法石 + 1精元结晶 + 3个对应属性灵石。",
-    variants: [
-      { name: "火系", materials: [{ name: "魔法石", count: 3 }, { name: "精元结晶", count: 1 }, { name: "火灵石", count: 3 }] },
-      { name: "水系", materials: [{ name: "魔法石", count: 3 }, { name: "精元结晶", count: 1 }, { name: "水灵石", count: 3 }] },
-      { name: "草系", materials: [{ name: "魔法石", count: 3 }, { name: "精元结晶", count: 1 }, { name: "木灵石", count: 3 }] },
-      { name: "电系", materials: [{ name: "魔法石", count: 3 }, { name: "精元结晶", count: 1 }, { name: "电灵石", count: 3 }] },
-      { name: "土系", materials: [{ name: "魔法石", count: 3 }, { name: "精元结晶", count: 1 }, { name: "土灵石", count: 3 }] },
-      { name: "光系", materials: [{ name: "魔法石", count: 3 }, { name: "精元结晶", count: 1 }, { name: "光灵石", count: 3 }] },
-      { name: "暗系", materials: [{ name: "魔法石", count: 3 }, { name: "精元结晶", count: 1 }, { name: "暗灵石", count: 3 }] },
-    ],
-  },
-  {
-    id: "prism-ball",
-    name: "棱镜球",
-    category: "咕噜球",
-    output: "1个/次",
-    note: "18级解锁炼金台后可合成。",
-    variants: [
-      { name: "固定配方", materials: [{ name: "损坏的国王球", count: 1 }, { name: "分光水晶", count: 1600 }] },
-    ],
-  },
-];
-
-const MATERIAL_LIBRARY = [...new Set([
-  "普通咕噜球",
-  "催化剂",
-  "光灵石",
-  "水灵石",
-  "木灵石",
-  "火灵石",
-  "土灵石",
-  "电灵石",
-  "暗灵石",
-  "木块",
-  "水滴",
-  "花朵",
-  "羽毛",
-  "叶子",
-  "魔法石",
-  "精元结晶",
-  "损坏的国王球",
-  "分光水晶",
-  "对应植物材料",
-  "蓝晶碧玺",
-  "紫莲刚玉",
-])];
 
 function numberValue(input) {
   const value = Number.parseFloat(input.value);
@@ -263,105 +126,6 @@ filters.forEach((button) => {
     render();
   });
 });
-
-function readInventory() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(INVENTORY_KEY) || "{}");
-    return typeof parsed === "object" && parsed ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveInventory() {
-  localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
-}
-
-function currentRecipe() {
-  return RECIPES.find((recipe) => recipe.id === recipeSelect.value) || RECIPES[0];
-}
-
-function currentVariant() {
-  const recipe = currentRecipe();
-  return recipe.variants[Number(variantSelect.value)] || recipe.variants[0];
-}
-
-function craftCount() {
-  const value = Number.parseInt(craftCountInput.value, 10);
-  return Number.isFinite(value) && value > 0 ? value : 1;
-}
-
-function merchantHasMaterial(name) {
-  return currentMerchantNames.includes(name);
-}
-
-function populateRecipeSelect() {
-  recipeSelect.innerHTML = RECIPES.map((recipe) => (
-    `<option value="${recipe.id}">${recipe.name}</option>`
-  )).join("");
-}
-
-function populateVariantSelect() {
-  const recipe = currentRecipe();
-  variantSelect.innerHTML = recipe.variants.map((variant, index) => (
-    `<option value="${index}">${variant.name}</option>`
-  )).join("");
-}
-
-function renderInventory() {
-  inventoryList.innerHTML = MATERIAL_LIBRARY.map((name) => {
-    const value = inventory[name] || "";
-    const merchantChip = merchantHasMaterial(name) ? '<span class="today-chip">今日商人</span>' : "";
-    return `
-      <label class="inventory-row">
-        <span>${name}${merchantChip}</span>
-        <input class="inventory-input" data-material="${name}" inputmode="numeric" type="number" min="0" step="1" value="${value}">
-      </label>
-    `;
-  }).join("");
-}
-
-function renderMaterialSummary() {
-  const recipe = currentRecipe();
-  const variant = currentVariant();
-  const times = craftCount();
-  const needs = variant.materials.map((material) => {
-    const required = material.count * times;
-    const owned = Number(inventory[material.name] || 0);
-    const missing = Math.max(0, required - owned);
-    return { ...material, required, owned, missing };
-  });
-  const complete = needs.every((item) => item.missing === 0);
-  const merchantMissing = needs.filter((item) => item.missing > 0 && merchantHasMaterial(item.name));
-
-  recipeNote.textContent = `${recipe.category} · ${recipe.output}。${recipe.note}`;
-  materialSummary.innerHTML = `
-    <div class="calc-result ${complete ? "ready" : "missing"}">
-      <div class="calc-status">
-        <span class="status-pill">${complete ? "材料够了" : "还差材料"}</span>
-        <h2>${recipe.name} × ${times}</h2>
-      </div>
-      <div class="material-lines">
-        ${needs.map((item) => `
-          <div class="material-line ${item.missing ? "is-missing" : "is-ready"}">
-            <div>
-              <strong>${item.name}</strong>
-              ${merchantHasMaterial(item.name) ? '<span class="today-chip">今日商人可补</span>' : ""}
-            </div>
-            <span>需要 ${item.required} / 已有 ${item.owned} / 还差 ${item.missing}</span>
-          </div>
-        `).join("")}
-      </div>
-      <p class="merchant-note">${merchantMissing.length ? `今天远行商人可能能补：${merchantMissing.map((item) => item.name).join("、")}。` : "远行商人若卖缺口材料，这里会自动标记。"}${recipe.id === "attribute-ball" ? ` ${ATTRIBUTE_BALL_NOTE}` : ""}</p>
-    </div>
-  `;
-}
-
-function renderMaterialCalculator() {
-  populateVariantSelect();
-  renderInventory();
-  renderMaterialSummary();
-}
 
 function fixMojibake(value) {
   if (typeof value !== "string" || !/[ÃÂÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ]/.test(value)) {
@@ -576,26 +340,20 @@ async function loadMerchant() {
     const items = resolved.items.map(normalizeMerchantItem);
     const sourceTime = data.fetchedAt ? new Date(data.fetchedAt).toLocaleString("zh-CN") : "未知时间";
 
-    currentMerchantNames = items.map((item) => item.name);
     merchantStatus.textContent = resolved.status;
     merchantRound.textContent = resolved.round ? `第 ${resolved.round} 轮` : "--";
     merchantNext.textContent = formatBeijingTime(resolved.nextRefreshBeijing);
     merchantNextDate = parseBeijingDate(resolved.nextRefreshBeijing);
     merchantNote.textContent = `数据更新于 ${sourceTime}，时间按北京时间显示。${resolved.note ? ` ${resolved.note}` : ""}`;
     renderMerchantItems(items);
-    renderInventory();
-    renderMaterialSummary();
     updateCountdown();
   } catch (error) {
-    currentMerchantNames = [];
     merchantStatus.textContent = "获取失败";
     merchantRound.textContent = "--";
     merchantNext.textContent = "--";
     merchantNextDate = null;
     merchantNote.textContent = "暂时无法获取远行商人数据，请稍后再试。";
     merchantItems.innerHTML = '<div class="empty">数据源暂时不可用。你可以点“刷新”重试。</div>';
-    renderInventory();
-    renderMaterialSummary();
     updateCountdown();
   } finally {
     refreshMerchantBtn.disabled = false;
@@ -604,21 +362,12 @@ async function loadMerchant() {
 
 function switchView(view) {
   const isMerchant = view === "merchant";
-  const isMaterials = view === "materials";
-  eggView.classList.toggle("is-hidden", isMerchant || isMaterials);
+  eggView.classList.toggle("is-hidden", isMerchant);
   merchantView.classList.toggle("is-hidden", !isMerchant);
-  materialsView.classList.toggle("is-hidden", !isMaterials);
   toolTabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === view));
 
   if (isMerchant && !merchantItems.innerHTML.trim()) {
     loadMerchant();
-  }
-
-  if (isMaterials) {
-    renderMaterialSummary();
-    if (!currentMerchantNames.length && !merchantItems.innerHTML.trim()) {
-      loadMerchant();
-    }
   }
 }
 
@@ -627,27 +376,7 @@ toolTabs.forEach((button) => {
 });
 
 refreshMerchantBtn.addEventListener("click", loadMerchant);
-recipeSelect.addEventListener("change", renderMaterialCalculator);
-variantSelect.addEventListener("change", renderMaterialSummary);
-craftCountInput.addEventListener("input", renderMaterialSummary);
-inventoryList.addEventListener("input", (event) => {
-  if (!event.target.matches(".inventory-input")) return;
-  const value = Number.parseInt(event.target.value, 10);
-  const name = event.target.dataset.material;
-  inventory[name] = Number.isFinite(value) && value > 0 ? value : 0;
-  saveInventory();
-  renderMaterialSummary();
-});
-clearInventoryBtn.addEventListener("click", () => {
-  if (!window.confirm("确定清空本机保存的材料库存吗？")) return;
-  inventory = {};
-  saveInventory();
-  renderMaterialCalculator();
-});
 
 window.setInterval(updateCountdown, 1000);
 
-inventory = readInventory();
-populateRecipeSelect();
-renderMaterialCalculator();
 render();
