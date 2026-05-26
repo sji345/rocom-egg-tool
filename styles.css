@@ -93,7 +93,9 @@ h1 {
 .search-panel,
 .result-summary,
 .source-box,
-.merchant-panel {
+.merchant-panel,
+.calc-panel,
+.inventory-panel {
   border: 3px solid var(--line);
   background: rgba(255, 255, 255, .88);
   box-shadow: 6px 6px 0 rgba(32, 49, 60, .13);
@@ -101,7 +103,7 @@ h1 {
 
 .tool-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin: 0 0 12px;
 }
@@ -137,7 +139,8 @@ label span {
   color: var(--muted);
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 54px;
   border: 2px solid var(--line);
@@ -151,7 +154,16 @@ input {
   outline: none;
 }
 
-input:focus {
+select {
+  appearance: none;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--line) 50%) calc(100% - 18px) 24px / 7px 7px no-repeat,
+    linear-gradient(135deg, var(--line) 50%, transparent 50%) calc(100% - 13px) 24px / 7px 7px no-repeat,
+    #fffdf7;
+}
+
+input:focus,
+select:focus {
   box-shadow: 0 0 0 4px rgba(246, 212, 90, .42);
 }
 
@@ -441,11 +453,149 @@ summary {
   color: var(--leaf);
 }
 
+.calc-panel,
+.inventory-panel {
+  padding: 14px;
+}
+
+.calc-head,
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.section-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.calc-form {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 96px;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.material-summary {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.calc-result {
+  border: 3px solid var(--line);
+  background: var(--panel);
+  box-shadow: 5px 5px 0 rgba(32, 49, 60, .13);
+  padding: 14px;
+}
+
+.calc-result.ready {
+  background: #f3fbf5;
+}
+
+.calc-result.missing {
+  background: #fffdf7;
+}
+
+.calc-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.calc-status h2 {
+  margin-top: 0;
+  text-align: right;
+}
+
+.material-lines {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.material-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 2px solid rgba(32, 49, 60, .72);
+  background: #fff;
+}
+
+.material-line strong {
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.material-line span:last-child {
+  font-weight: 900;
+  text-align: right;
+}
+
+.material-line.is-missing {
+  border-color: var(--coral);
+}
+
+.material-line.is-ready {
+  border-color: var(--leaf);
+}
+
+.inventory-panel {
+  margin-top: 14px;
+}
+
+.inventory-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.inventory-row {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 2px solid rgba(32, 49, 60, .62);
+  background: #fffdf7;
+}
+
+.inventory-row span {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.inventory-input {
+  min-height: 42px;
+  text-align: center;
+}
+
+.today-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  margin-left: 6px;
+  padding: 0 7px;
+  border: 1.5px solid var(--line);
+  background: var(--sun);
+  font-size: 11px;
+  font-weight: 950;
+}
+
 @media (max-width: 460px) {
   .app-shell { padding-left: 12px; padding-right: 12px; }
   .hero { grid-template-columns: 78px 1fr; gap: 12px; }
   .egg-mark { width: 74px; height: 84px; }
   h1 { font-size: 32px; }
+  .tool-tab { min-height: 42px; font-size: 13px; }
   .field-grid { grid-template-columns: 1fr; }
   .result-summary { display: block; }
   #resultHint { max-width: none; margin-top: 10px; text-align: left; }
@@ -454,4 +604,12 @@ summary {
   .merchant-card { grid-template-columns: 78px 1fr; }
   .merchant-image { width: 78px; height: 78px; }
   .merchant-image img { max-width: 68px; max-height: 68px; }
+  .calc-form { grid-template-columns: 1fr; }
+  .calc-status,
+  .section-title { display: block; }
+  .calc-status h2,
+  .section-title span { text-align: left; }
+  .material-line { grid-template-columns: 1fr; }
+  .material-line span:last-child { text-align: left; }
+  .inventory-row { grid-template-columns: 1fr 82px; }
 }
