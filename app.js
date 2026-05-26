@@ -1,5 +1,51 @@
 ﻿const records = window.EGG_RECORDS || [];
 
+const shinyPets = [
+  { name: "恶魔叮", groups: ["妖精组"], confidence: "高" },
+  { name: "幽影树", groups: ["妖精组", "植物组"], confidence: "高" },
+  { name: "嘟嘟煲", groups: ["妖精组", "大地组"], confidence: "高" },
+  { name: "小夜", groups: ["妖精组", "拟人组"], confidence: "高" },
+  { name: "加油海葵", groups: ["妖精组", "两栖组"], confidence: "高" },
+  { name: "小丑豆豆", groups: ["妖精组", "拟人组"], confidence: "高" },
+  { name: "咕咕帽", groups: ["妖精组"], confidence: "高" },
+  { name: "牵线木偶", groups: ["妖精组", "拟人组"], confidence: "高" },
+  { name: "大耳帽兜", groups: ["妖精组", "拟人组"], confidence: "高" },
+  { name: "拉特", groups: ["妖精组"], confidence: "高" },
+  { name: "治愈兔", groups: ["妖精组", "动物组"], confidence: "高" },
+  { name: "格兰种子", groups: ["妖精组", "植物组"], confidence: "高" },
+  { name: "粉粉星", groups: ["妖精组", "软体组"], confidence: "中", note: "图片字符较小，按全33名单与图标判断。" },
+  { name: "粉星仔", groups: ["妖精组", "天空组"], confidence: "高" },
+  { name: "小独角兽", groups: ["动物组", "巨灵组"], confidence: "高" },
+  { name: "灵狐", groups: ["动物组"], confidence: "高" },
+  { name: "猴麦仔", groups: ["动物组", "机械组"], confidence: "高" },
+  { name: "炫光迪迪", groups: ["动物组", "大地组"], confidence: "高" },
+  { name: "小鼓象", groups: ["动物组", "机械组"], confidence: "高" },
+  { name: "恶魔狼", groups: ["动物组"], confidence: "高" },
+  { name: "呼呼猪", groups: ["动物组"], confidence: "高" },
+  { name: "月牙雪熊", groups: ["动物组", "巨灵组"], confidence: "高", aliases: ["月牙熊"] },
+  { name: "火红尾", groups: ["动物组"], confidence: "高" },
+  { name: "烟花团", groups: ["机械组", "魔力组"], confidence: "高" },
+  { name: "机械方方", groups: ["机械组", "拟人组"], confidence: "高" },
+  { name: "贝瑟", groups: ["机械组"], confidence: "中", note: "部分攻略写作贝古斯，建议以游戏内图鉴复核。", aliases: ["贝古斯"] },
+  { name: "菊花梨", groups: ["植物组"], confidence: "高" },
+  { name: "奇丽草", groups: ["植物组"], confidence: "高" },
+  { name: "柴渣虫", groups: ["植物组", "昆虫组"], confidence: "高" },
+  { name: "空空颅", groups: ["巨灵组", "魔力组"], confidence: "高" },
+  { name: "嗜光嗡嗡", groups: ["昆虫组"], confidence: "高" },
+  { name: "公平鸽", groups: ["天空组"], confidence: "高" },
+  { name: "双灯鱼", groups: ["海洋组"], confidence: "高" },
+];
+
+const s1Routes = [
+  { group: "妖精组", target: "红绒十字", parents: ["酷拉", "雪影娃娃", "小皮球", "粉星仔", "格兰种子"] },
+  { group: "动物组", target: "红绒十字", parents: ["恶魔狼", "月牙雪熊", "獠牙猪", "雅丹鬃"] },
+  { group: "巨灵组", target: "月牙雪熊", parents: ["空空颅", "粉星仔"] },
+  { group: "拟人组", target: "立方人", parents: ["立方人"] },
+  { group: "机械组", target: "立方人", parents: ["贝瑟", "贝古斯"] },
+  { group: "植物组", target: "格兰种子", parents: ["燃薪虫", "奇丽花"] },
+  { group: "昆虫组", target: "燃薪虫", parents: ["窃光蚊", "燃薪虫"] },
+];
+
 const heightInput = document.querySelector("#heightInput");
 const weightInput = document.querySelector("#weightInput");
 const resultsEl = document.querySelector("#results");
@@ -11,6 +57,7 @@ const filters = [...document.querySelectorAll(".filter")];
 const toolTabs = [...document.querySelectorAll(".tool-tab")];
 const eggView = document.querySelector("#eggView");
 const merchantView = document.querySelector("#merchantView");
+const breedingView = document.querySelector("#breedingView");
 const merchantStatus = document.querySelector("#merchantStatus");
 const merchantRound = document.querySelector("#merchantRound");
 const merchantNext = document.querySelector("#merchantNext");
@@ -18,13 +65,21 @@ const merchantCountdown = document.querySelector("#merchantCountdown");
 const merchantNote = document.querySelector("#merchantNote");
 const merchantItems = document.querySelector("#merchantItems");
 const refreshMerchantBtn = document.querySelector("#refreshMerchantBtn");
+const breedingSearch = document.querySelector("#breedingSearch");
+const partnerSearch = document.querySelector("#partnerSearch");
+const compatResult = document.querySelector("#compatResult");
+const breedingGroups = document.querySelector("#breedingGroups");
+const breedingResults = document.querySelector("#breedingResults");
+const breedingCount = document.querySelector("#breedingCount");
 
 let activeFilter = "all";
+let activeBreedingGroup = "all";
 let merchantNextDate = null;
 let merchantLastAutoRefresh = 0;
 
 const MERCHANT_REFRESH_HOURS = [8, 12, 16, 20];
 const MERCHANT_RETRY_INTERVAL = 60000;
+const breedingGroupNames = ["全部", ...new Set(shinyPets.flatMap((pet) => pet.groups))];
 
 function numberValue(input) {
   const value = Number.parseFloat(input.value);
@@ -360,14 +415,153 @@ async function loadMerchant() {
   }
 }
 
+function petMatchesQuery(pet, query) {
+  if (!query) return true;
+  const text = query.trim().toLowerCase();
+  return pet.name.toLowerCase().includes(text) || (pet.aliases || []).some((alias) => alias.toLowerCase().includes(text));
+}
+
+function findShinyPet(query) {
+  const text = query.trim();
+  if (!text) return null;
+  return shinyPets.find((pet) => pet.name === text || (pet.aliases || []).includes(text))
+    || shinyPets.find((pet) => petMatchesQuery(pet, text))
+    || null;
+}
+
+function sharedGroups(a, b) {
+  return a.groups.filter((group) => b.groups.includes(group));
+}
+
+function partnersFor(pet) {
+  return shinyPets
+    .filter((candidate) => candidate.name !== pet.name)
+    .map((candidate) => ({ pet: candidate, groups: sharedGroups(pet, candidate) }))
+    .filter((item) => item.groups.length)
+    .sort((a, b) => b.groups.length - a.groups.length || a.pet.name.localeCompare(b.pet.name, "zh-CN"));
+}
+
+function renderBreedingGroups() {
+  breedingGroups.innerHTML = breedingGroupNames.map((group) => {
+    const value = group === "全部" ? "all" : group;
+    const active = activeBreedingGroup === value ? " is-active" : "";
+    return `<button class="group-filter${active}" data-group="${value}" type="button">${group}</button>`;
+  }).join("");
+}
+
+function renderCompatibility() {
+  const first = findShinyPet(breedingSearch.value);
+  const second = findShinyPet(partnerSearch.value);
+
+  compatResult.classList.remove("hit", "loose");
+
+  if (!breedingSearch.value.trim() && !partnerSearch.value.trim()) {
+    compatResult.textContent = "输入两只精灵，可以快速检查是否同蛋组。";
+    return;
+  }
+
+  if (!first || !second) {
+    const missing = [
+      breedingSearch.value.trim() && !first ? "目标精灵未收录" : "",
+      partnerSearch.value.trim() && !second ? "配偶精灵未收录" : "",
+    ].filter(Boolean).join("，");
+    compatResult.textContent = `${missing || "继续输入"}。当前只覆盖 S1-S2 全33只异色蛋组。`;
+    compatResult.classList.add("loose");
+    return;
+  }
+
+  const common = sharedGroups(first, second);
+  if (common.length) {
+    compatResult.innerHTML = `<strong>${first.name}</strong> 和 <strong>${second.name}</strong> 可以尝试孵蛋，共享 ${common.join("、")}。`;
+    compatResult.classList.add("hit");
+  } else {
+    compatResult.innerHTML = `<strong>${first.name}</strong> 和 <strong>${second.name}</strong> 在当前表里没有共享蛋组。`;
+    compatResult.classList.add("loose");
+  }
+}
+
+function renderBreedingCard(pet) {
+  const partners = partnersFor(pet);
+  const groups = pet.groups.map((group) => `<span class="chip">${group}</span>`).join("");
+  const status = pet.confidence === "中" ? "pending" : "hit";
+  const partnerTags = partners.map((item) => {
+    const title = item.groups.join("、");
+    return `<span class="partner-chip" title="${title}">${item.pet.name}</span>`;
+  }).join("");
+
+  return `
+    <article class="card ${status}">
+      <div class="card-main">
+        <div class="topline">
+          <h3 class="name">${pet.name}</h3>
+          <div class="score">${partners.length} 个</div>
+        </div>
+        <div class="meta">
+          ${groups}
+          <span class="chip">置信度 ${pet.confidence}</span>
+        </div>
+        <div class="partner-list">${partnerTags || '<span class="partner-chip">当前无同组异色</span>'}</div>
+        ${pet.note ? `<p class="evolution">${pet.note}</p>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function renderS1Routes() {
+  return `
+    <article class="card pending">
+      <div class="card-main">
+        <div class="topline">
+          <h3 class="name">S1路线补充</h3>
+          <div class="score">${s1Routes.length} 组</div>
+        </div>
+        <div class="partner-list">
+          ${s1Routes.map((route) => `<span class="partner-chip">${route.group}：${route.target}</span>`).join("")}
+        </div>
+        <p class="evolution">这部分来自文字攻略路线，和全33只分组图不是同一个口径，只作为路线参考。</p>
+      </div>
+    </article>
+  `;
+}
+
+function renderBreeding() {
+  const query = breedingSearch.value.trim();
+  const group = activeBreedingGroup;
+  const filtered = shinyPets.filter((pet) => {
+    const inGroup = group === "all" || pet.groups.includes(group);
+    return inGroup && petMatchesQuery(pet, query);
+  });
+
+  breedingCount.textContent = `${filtered.length} / ${shinyPets.length}`;
+  renderCompatibility();
+
+  if (!filtered.length) {
+    breedingResults.innerHTML = '<div class="empty">没有找到匹配的异色蛋组记录。</div>';
+    return;
+  }
+
+  const focused = findShinyPet(query);
+  const rows = focused && filtered.some((pet) => pet.name === focused.name)
+    ? [focused, ...filtered.filter((pet) => pet.name !== focused.name)]
+    : filtered;
+
+  breedingResults.innerHTML = rows.map(renderBreedingCard).join("") + renderS1Routes();
+}
+
 function switchView(view) {
   const isMerchant = view === "merchant";
-  eggView.classList.toggle("is-hidden", isMerchant);
+  const isBreeding = view === "breeding";
+  eggView.classList.toggle("is-hidden", isMerchant || isBreeding);
   merchantView.classList.toggle("is-hidden", !isMerchant);
+  breedingView.classList.toggle("is-hidden", !isBreeding);
   toolTabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === view));
 
   if (isMerchant && !merchantItems.innerHTML.trim()) {
     loadMerchant();
+  }
+
+  if (isBreeding && !breedingResults.innerHTML.trim()) {
+    renderBreeding();
   }
 }
 
@@ -376,7 +570,17 @@ toolTabs.forEach((button) => {
 });
 
 refreshMerchantBtn.addEventListener("click", loadMerchant);
+breedingSearch.addEventListener("input", renderBreeding);
+partnerSearch.addEventListener("input", renderBreeding);
+breedingGroups.addEventListener("click", (event) => {
+  const button = event.target.closest(".group-filter");
+  if (!button) return;
+  activeBreedingGroup = button.dataset.group;
+  renderBreedingGroups();
+  renderBreeding();
+});
 
 window.setInterval(updateCountdown, 1000);
 
+renderBreedingGroups();
 render();
